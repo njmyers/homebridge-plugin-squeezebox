@@ -1,3 +1,4 @@
+import { ConsoleLogger } from '../src/logger';
 import {
   LMSServer,
   LMSPlayer,
@@ -19,7 +20,7 @@ const server = new LMSServer({
       name: response.result.players_loop[0].name,
       port: 9000,
       host: '192.168.1.50',
-      logger: console,
+      logger: new ConsoleLogger(),
     });
 
     player.subscribe(
