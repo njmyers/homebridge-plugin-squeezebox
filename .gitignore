@@ -124,3 +124,6 @@ dist
 .idea
 
 /test/hbConfig
+
+src/schemas/types/*
+!src/schemas/types/.gitkeep
