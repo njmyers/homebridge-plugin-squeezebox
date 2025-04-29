@@ -7,19 +7,22 @@ import {
   LMSCommands,
 } from '../src/lms';
 
-const server = new LMSServer({
-  port: 9000,
-  host: '192.168.1.50',
-});
+const host = process.env.LMS_HOST;
+const port = 9000;
 
 (async () => {
   try {
+    if (!host) {
+      throw new Error('LMS_HOST environment variable is not set.');
+    }
+
+    const server = new LMSServer({ port, host });
     const response = await server.getPlayers();
     const player = new LMSPlayer({
       id: response.result.players_loop[0].playerid,
       name: response.result.players_loop[0].name,
-      port: 9000,
-      host: '192.168.1.50',
+      port,
+      host,
       logger: new ConsoleLogger(),
     });
 
