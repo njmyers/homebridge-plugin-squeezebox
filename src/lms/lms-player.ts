@@ -1,7 +1,8 @@
 import { Callback, CometD, SubscriptionHandle } from 'cometd';
 import { adapt } from 'cometd-nodejs-client';
-import { Logger } from 'homebridge';
+import { Logger } from '../logger';
 import { LMSMessage } from './lms-message';
+import { Validators } from '../schemas';
 
 export interface SqueezePlayerOptions {
   id: string;
@@ -42,10 +43,10 @@ export class LMSPlayer {
   ) {
     this.cometd.handshake(handshake => {
       if (handshake.successful) {
-        this.logger.debug(
-          `LMS Server handshake successful: ${this.name}`,
+        this.logger.debug('LMS Server handshake successful', {
+          name: this.name,
           handshake,
-        );
+        });
 
         const request = {
           response: `/slim/${handshake.clientId}/request`,
@@ -59,7 +60,14 @@ export class LMSPlayer {
         );
 
         this.cometd.publish('/slim/request', request, response => {
-          onMessage(response);
+          if (!Validators.ChannelEvent.validate(response)) {
+            this.logger.error('Unknown message received from LMS server', {
+              name: this.name,
+              response,
+            });
+          } else {
+            onMessage(response);
+          }
         });
       }
     });
