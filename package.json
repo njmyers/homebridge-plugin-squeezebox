@@ -1,5 +1,5 @@
 {
-  "name": "homebridge-plugin-name",
+  "name": "@njmyers/homebridge-plugin-squeezebox",
   "displayName": "Plugin Name",
   "type": "module",
   "version": "1.0.0",

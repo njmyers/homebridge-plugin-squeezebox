@@ -1,42 +1,39 @@
-import type * as LMS from '../schemas/types';
-import { Validators } from '../schemas';
-import { LMSCommands } from './lms-commands';
-import { LMSMessage } from './lms-message';
+import type * as LMS from '../schemas/types/index.js';
+import { Validators } from '../schemas/index.js';
+import { LMSCommands } from './lms-commands.js';
+import { LMSMessage } from './lms-message.js';
+import { request } from './request.js';
+import { Logger } from '../logger.js';
 
 interface LMSServerOptions {
   host: string;
   port: number;
+  log: Logger;
 }
 
 export class LMSServer {
   private host: string;
   private port: number;
+  private log: Logger;
 
-  constructor({ host, port }: LMSServerOptions) {
+  constructor({ host, port, log }: LMSServerOptions) {
     this.host = host;
     this.port = port;
+    this.log = log;
   }
 
-  private async request(player: string, message: LMSMessage): Promise<unknown> {
-    const response = await fetch(
-      `http://${this.host}:${this.port}/jsonrpc.js`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          method: 'slim.request',
-          params: [player, message.toJSON()],
-        }),
-      },
-    );
-
-    return await response.json();
+  private async send(player: string, message: LMSMessage): Promise<unknown> {
+    return request({
+      host: this.host,
+      port: this.port,
+      player,
+      message,
+      logger: this.log,
+    });
   }
 
   async getPlayers(): Promise<LMS.PlayersResponse> {
-    const data = await this.request(
+    const data = await this.send(
       'FF:FF:FF:FF',
       new LMSMessage({
         command: LMSCommands.Players,
@@ -52,7 +49,7 @@ export class LMSServer {
   }
 
   async getPlayerStatus(player: string): Promise<LMS.PlayerStatusResponse> {
-    const data = await this.request(
+    const data = await this.send(
       player,
       new LMSMessage({
         command: LMSCommands.Status,
@@ -61,8 +58,6 @@ export class LMSServer {
     );
 
     if (!Validators.PlayerStatusResponse.validate(data)) {
-      console.log(Validators.PlayerStatusResponse.validate.errors);
-      console.log(JSON.stringify(data, null, 2));
       throw new Error('Invalid getPlayerStatus response from server');
     }
 

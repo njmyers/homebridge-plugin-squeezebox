@@ -7,8 +7,8 @@ import {
   PlayerStatusEvent,
   SubscriptionStatusEvent,
   ChannelEvent,
-} from './player';
-import * as T from './types';
+} from './player.js';
+import * as T from './types/index.js';
 
 export const Schemas = {
   Player,

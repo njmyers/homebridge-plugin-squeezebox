@@ -1,16 +1,33 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "SqueezeboxHomebridgePlugin",
   "pluginType": "platform",
   "singular": true,
   "strictValidation": false,
   "schema": {
-    "type": "object",
-    "properties": {
-      "name": {
-        "title": "Name",
-        "type": "string",
-        "required": true,
-        "default": "Example Dynamic Platform"
+    "type": "array",
+    "title": "Accessories",
+    "description": "List of accessories to be created.",
+    "items": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string",
+          "required": true,
+          "default": "Home LMS"
+        },
+        "host": {
+          "title": "Host",
+          "type": "string",
+          "required": true,
+          "default": "192.168.1.1"
+        },
+        "port": {
+          "title": "Port",
+          "type": "integer",
+          "required": true,
+          "default": 9000
+        }
       }
     }
   }

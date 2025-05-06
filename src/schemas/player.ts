@@ -260,6 +260,22 @@ export const PlayerStatus = {
       description: 'Replay gain status',
     },
   },
+  required: [
+    'signalstrength',
+    'playlist mode',
+    'player_name',
+    'playlist repeat',
+    'player_connected',
+    'digital_volume_control',
+    'seq_no',
+    'mode',
+    'mixer volume',
+    'use_volume_control',
+    'randomplay',
+    'playlist shuffle',
+    'power',
+    'playlist_tracks',
+  ],
 } as const;
 
 export const PlayerStatusResponse = {
@@ -304,7 +320,7 @@ export const PlayerStatusEvent = {
     },
     data: {
       description: 'Player status event object',
-      additionalProperties: false,
+      additionalProperties: true,
       type: 'object',
       oneOf: [PlayerStatus],
     },

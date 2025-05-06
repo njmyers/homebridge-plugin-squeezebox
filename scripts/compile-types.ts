@@ -17,7 +17,7 @@ const TYPES_FOLDER = 'src/schemas/types';
     }
 
     const index = schemas.reduce((acc, schema) => {
-      return acc + `export * from './${_.kebabCase(schema.title)}';\n`;
+      return acc + `export { ${(schema.title)} } from './${_.kebabCase(schema.title)}.js';\n`;
     }, '');
 
     await fs.writeFile(`${TYPES_FOLDER}/index.ts`, index);

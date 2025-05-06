@@ -5,9 +5,10 @@
     "port": 51826,
     "pin": "031-45-154"
   },
+  "logLevel": "debug",
   "description": "HomeBridge HTTP Status Control",
   "plugins": [
-    "homebridge-plugin-name",
+    "@njmyers/homebridge-plugin-squeezebox",
     "homebridge-config-ui-x"
   ],
   "platforms": [
@@ -20,11 +21,18 @@
       "lang": "auto",
       "sudo": false,
       "platform": "config",
-      "debug": false
+      "debug": true
     },
     {
-      "name": "homebridge-plugin-name",
-      "platform": "ExampleHomebridgePlugin"
+      "name": "@njmyers/homebridge-plugin-squeezebox",
+      "platform": "SqueezeboxHomebridgePlugin",
+      "accessories": [
+        {
+          "name": "Home LMS Platform",
+          "host": "192.168.1.50",
+          "port": 9000
+        }
+      ]
     }
   ],
   "accessories": []

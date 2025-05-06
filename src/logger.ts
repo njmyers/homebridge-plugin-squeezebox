@@ -1,3 +1,6 @@
+import { CharacteristicValue } from 'homebridge';
+import type { SqueezeboxHomebridgePlatform } from './platform.js';
+
 export interface Logger {
   info(message: string, ...parameters: unknown[]): void;
   success(message: string, ...parameters: unknown[]): void;
@@ -25,5 +28,49 @@ export class ConsoleLogger implements Logger {
 
   debug(message: string, ...parameters: unknown[]): void {
     console.debug(message, ...parameters);
+  }
+}
+
+export class ServiceLogger {
+  constructor(
+    private readonly platform: SqueezeboxHomebridgePlatform,
+    private readonly name: CharacteristicValue,
+  ) {}
+
+  info(message: string, params?: Record<string, unknown>) {
+    this.platform.log.info(message, {
+      service: this.constructor.name,
+      name: this.name,
+      ...params,
+    });
+  }
+
+  warn(message: string, params?: Record<string, unknown>) {
+    this.platform.log.warn(message, {
+      service: this.constructor.name,
+      name: this.name,
+      ...params,
+    });
+  }
+  error(message: string, params?: Record<string, unknown>) {
+    this.platform.log.error(message, {
+      service: this.constructor.name,
+      name: this.name,
+      ...params,
+    });
+  }
+  debug(message: string, params?: Record<string, unknown>) {
+    this.platform.log.debug(message, {
+      service: this.constructor.name,
+      name: this.name,
+      ...params,
+    });
+  }
+  success(message: string, params?: Record<string, unknown>) {
+    this.platform.log.debug(message, {
+      service: this.constructor.name,
+      name: this.name,
+      ...params,
+    });
   }
 }

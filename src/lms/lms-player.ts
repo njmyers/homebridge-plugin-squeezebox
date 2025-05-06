@@ -1,8 +1,13 @@
-import { Callback, CometD, SubscriptionHandle } from 'cometd';
+import { CometD, Message, SubscriptionHandle } from 'cometd';
 import { adapt } from 'cometd-nodejs-client';
-import { Logger } from '../logger';
-import { LMSMessage } from './lms-message';
-import { Validators } from '../schemas';
+import { request } from './request.js';
+import { Logger } from '../logger.js';
+import { LMSMessage } from './lms-message.js';
+import { Validators } from '../schemas/index.js';
+import {
+  ChannelEvent,
+  SubscriptionStatusEvent,
+} from '../schemas/types/index.js';
 
 export interface SqueezePlayerOptions {
   id: string;
@@ -10,6 +15,10 @@ export interface SqueezePlayerOptions {
   host: string;
   port: number;
   logger: Logger;
+}
+
+export interface MessageHandler<T> {
+  (message: T): void;
 }
 
 export class LMSPlayer {
@@ -36,10 +45,26 @@ export class LMSPlayer {
     });
   }
 
+  get manufacturer() {
+    return 'Logitech';
+  }
+
+  get model() {
+    return 'Squeezebox';
+  }
+
+  get serialNumber() {
+    return this.id;
+  }
+
+  get displayName() {
+    return this.name;
+  }
+
   subscribe(
     message: LMSMessage,
-    onMessage: Callback,
-    onSubscription: Callback,
+    handleChanelEvent: MessageHandler<ChannelEvent>,
+    handleSubscriptionEvent: MessageHandler<SubscriptionStatusEvent>,
   ) {
     this.cometd.handshake(handshake => {
       if (handshake.successful) {
@@ -55,19 +80,16 @@ export class LMSPlayer {
 
         this.subscription = this.cometd.subscribe(
           `/slim/${handshake.clientId}/request`,
-          onMessage,
-          onSubscription,
+          response => {
+            this.handleChannel(response, handleChanelEvent);
+          },
+          response => {
+            this.handleSubscription(response, handleSubscriptionEvent);
+          },
         );
 
         this.cometd.publish('/slim/request', request, response => {
-          if (!Validators.ChannelEvent.validate(response)) {
-            this.logger.error('Unknown message received from LMS server', {
-              name: this.name,
-              response,
-            });
-          } else {
-            onMessage(response);
-          }
+          this.handleChannel(response, handleChanelEvent);
         });
       }
     });
@@ -77,6 +99,49 @@ export class LMSPlayer {
     if (this.subscription) {
       this.cometd.unsubscribe(this.subscription);
       this.subscription = null;
+    }
+  }
+
+  async send(message: LMSMessage) {
+    return await request({
+      host: this.host,
+      port: this.port,
+      player: this.id,
+      message,
+      logger: this.logger,
+    });
+  }
+
+  private handleChannel(
+    message: Message,
+    handler: MessageHandler<ChannelEvent>,
+  ) {
+    if (!Validators.ChannelEvent.validate(message)) {
+      this.logger.error('Unknown message received from LMS server', {
+        name: this.name,
+        message,
+        errors: Validators.ChannelEvent.validate.errors,
+      });
+    } else {
+      handler(message);
+    }
+  }
+
+  private handleSubscription(
+    message: Message,
+    handler: MessageHandler<SubscriptionStatusEvent>,
+  ) {
+    if (!Validators.SubscriptionStatusEvent.validate(message)) {
+      this.logger.error(
+        'Unknown subscription status received from LMS server',
+        {
+          name: this.name,
+          message,
+          errors: Validators.SubscriptionStatusEvent.validate.errors,
+        },
+      );
+    } else {
+      handler(message);
     }
   }
 }

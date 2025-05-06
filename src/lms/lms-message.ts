@@ -1,5 +1,5 @@
-import { LMSCommands } from './lms-commands';
-import { LMSTag } from './lms-player-tags';
+import { LMSCommands } from './lms-commands.js';
+import { LMSTag } from './lms-player-tags.js';
 
 export interface LMSMessageOptions {
   command: LMSCommands;
@@ -18,13 +18,11 @@ export class LMSMessage {
     this.tags = tags;
   }
 
-  toJSON(): (string | number)[] {
+  toJSON(): (string | number | Record<string, unknown>)[] {
     return [
       this.command,
       ...this.args,
-      ...([
-        this.tags.length ? `tags:${this.tags.join('')}` : ([] as string[]),
-      ] as string[]),
+      ...(this.tags.length ? [{ tags: this.tags.join('') }] : []),
     ];
   }
 }
