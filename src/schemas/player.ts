@@ -1,3 +1,5 @@
+import { EventData } from './event.js';
+
 export const Player = {
   title: 'Player',
   type: 'object',
@@ -299,60 +301,18 @@ export const PlayerStatusResponse = {
 export const PlayerStatusEvent = {
   title: 'PlayerStatusEvent',
   type: 'object',
-  properties: {
-    id: {
-      type: 'string',
-      description: 'Player ID',
-    },
-    channel: {
-      type: 'string',
-      description: 'Channel name',
-    },
-    ext: {
+  allOf: [
+    EventData,
+    {
+      description: 'Player status event object',
       type: 'object',
-      description: 'Extension data',
+      required: ['data'],
       properties: {
-        priority: {
-          type: 'string',
-          description: 'Currently unknown what this field means',
+        data: {
+          oneOf: [PlayerStatus],
         },
       },
     },
-    data: {
-      description: 'Player status event object',
-      additionalProperties: true,
-      type: 'object',
-      oneOf: [PlayerStatus],
-    },
-  },
-  required: ['data'],
+  ],
 } as const;
 
-export const SubscriptionStatusEvent = {
-  title: 'SubscriptionStatusEvent',
-  type: 'object',
-  properties: {
-    successful: {
-      type: 'boolean',
-      description: 'Subscription status',
-    },
-    channel: {
-      type: 'string',
-      description: 'Channel name',
-    },
-    id: {
-      type: 'string',
-      description: 'ID of the subscription',
-    },
-    clientId: {
-      type: 'string',
-      description: 'Client ID',
-    },
-  },
-  required: ['successful', 'channel', 'id', 'clientId'],
-} as const;
-
-export const ChannelEvent = {
-  title: 'ChannelEvent',
-  oneOf: [PlayerStatusEvent, SubscriptionStatusEvent],
-};

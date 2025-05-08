@@ -2,7 +2,6 @@ import type { PlatformAccessory } from 'homebridge';
 
 import {
   SqueezeBoxInformationService,
-  SqueezeBoxInputService,
   SqueezeBoxSpeakerService,
   SqueezeBoxSwitchService,
   SqueezeBoxTelevisionService,
@@ -39,7 +38,6 @@ export class SqueezeboxPlatformPlayerAccessory {
   private switch: SqueezeBoxSwitchService | null = null;
   private speaker: SqueezeBoxSpeakerService | null = null;
   private information: SqueezeBoxInformationService;
-  private inputs: SqueezeBoxInputService[] = [];
 
   private subscribers: StatusSubscriber[] = [];
   private log: ServiceLogger;
@@ -48,44 +46,16 @@ export class SqueezeboxPlatformPlayerAccessory {
     private readonly platform: SqueezeboxHomebridgePlatform,
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
   ) {
-    this.log = new ServiceLogger(this.platform, this.Name);
+    this.log = new ServiceLogger(platform, this.constructor.name, this.Name);
     this.information = new SqueezeBoxInformationService(
       this.platform,
       this.accessory,
-    );
-
-    this.inputs.push(
-      new SqueezeBoxInputService(
-        this.platform,
-        this.accessory,
-        this.accessory.context.player,
-        1,
-      ),
-      new SqueezeBoxInputService(
-        this.platform,
-        this.accessory,
-        this.accessory.context.player,
-        2,
-      ),
-      new SqueezeBoxInputService(
-        this.platform,
-        this.accessory,
-        this.accessory.context.player,
-        3,
-      ),
-      new SqueezeBoxInputService(
-        this.platform,
-        this.accessory,
-        this.accessory.context.player,
-        4,
-      ),
     );
 
     this.television = new SqueezeBoxTelevisionService(
       this.platform,
       this.accessory,
       this.accessory.context.player,
-      this.inputs,
     );
 
     this.subscribers.push(this.television);
@@ -111,13 +81,30 @@ export class SqueezeboxPlatformPlayerAccessory {
     }
 
     this.accessory.context.player.subscribe(
-      new LMSMessage({
-        command: LMSCommands.Status,
-        args: ['-', 1, 'subscribe:30'],
-        tags: [LMSTag.Volume, LMSTag.PlayerState],
-      }),
       message => this.handler(message),
-      subscription => this.log.info('Subscription enabled', subscription),
+      subscription => {
+        this.log.info('Subscription enabled', subscription);
+
+        const commands = [
+          new LMSMessage({
+            command: LMSCommands.Status,
+            args: ['-', 1, 'subscribe:30'],
+            tags: [LMSTag.Volume, LMSTag.PlayerState],
+          }),
+          new LMSMessage({
+            command: LMSCommands.Favorites,
+            args: ['items', 0, 10, 'subscribe:30'],
+          }),
+        ];
+
+        commands.forEach(command => {
+          this.accessory.context.player.publish(
+            subscription.clientId,
+            command,
+            message => this.handler(message),
+          );
+        });
+      },
     );
   }
 
@@ -126,16 +113,34 @@ export class SqueezeboxPlatformPlayerAccessory {
   }
 
   private handler(event: ChannelEvent) {
-    if (!Validators.PlayerStatusEvent.validate(event)) {
-      return this.log.error(
-        'Received non player status message from LMS server',
-        { event },
-      );
+    if (Validators.PlayerStatusEvent.validate(event)) {
+      const message = new LMSPlayerStatus(event.data);
+      return this.subscribers.forEach(subscriber => {
+        if (subscriber.status) {
+          subscriber.status(message);
+        }
+      });
     }
 
-    const message = new LMSPlayerStatus(event.data);
-    this.subscribers.forEach(subscriber => {
-      subscriber.update(message);
-    });
+    if (Validators.FavoritesEvent.validate(event)) {
+      return this.subscribers.forEach(subscriber => {
+        if (subscriber.favorites) {
+          subscriber.favorites(event);
+        }
+      });
+    }
+
+    if (Validators.SubscriptionEvent.validate(event)) {
+      return this.subscribers.forEach(subscriber => {
+        if (subscriber.subscription) {
+          subscriber.subscription(event);
+        }
+      });
+    }
+
+    return this.log.error(
+      'Received non player status message from LMS server',
+      { event },
+    );
   }
 }

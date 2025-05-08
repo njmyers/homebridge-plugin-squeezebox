@@ -4,10 +4,7 @@ import { request } from './request.js';
 import { Logger } from '../logger.js';
 import { LMSMessage } from './lms-message.js';
 import { Validators } from '../schemas/index.js';
-import {
-  ChannelEvent,
-  SubscriptionStatusEvent,
-} from '../schemas/types/index.js';
+import { ChannelEvent, SubscriptionEvent } from '../schemas/types/index.js';
 
 export interface SqueezePlayerOptions {
   id: string;
@@ -62,9 +59,8 @@ export class LMSPlayer {
   }
 
   subscribe(
-    message: LMSMessage,
-    handleChanelEvent: MessageHandler<ChannelEvent>,
-    handleSubscriptionEvent: MessageHandler<SubscriptionStatusEvent>,
+    onChannel: MessageHandler<ChannelEvent>,
+    onSubscription: MessageHandler<SubscriptionEvent>,
   ) {
     this.cometd.handshake(handshake => {
       if (handshake.successful) {
@@ -73,26 +69,35 @@ export class LMSPlayer {
           handshake,
         });
 
-        const request = {
-          response: `/slim/${handshake.clientId}/request`,
-          request: [this.id, message.toJSON()],
-        };
-
         this.subscription = this.cometd.subscribe(
           `/slim/${handshake.clientId}/request`,
-          response => {
-            this.handleChannel(response, handleChanelEvent);
-          },
-          response => {
-            this.handleSubscription(response, handleSubscriptionEvent);
-          },
+          response => this.onChannel(response, onChannel),
+          response => this.onSubscription(response, onSubscription),
         );
-
-        this.cometd.publish('/slim/request', request, response => {
-          this.handleChannel(response, handleChanelEvent);
-        });
       }
     });
+  }
+
+  publish(
+    clientId: string,
+    command: LMSMessage,
+    handler: MessageHandler<ChannelEvent>,
+  ) {
+    try {
+      const request = {
+        response: `/slim/${clientId}/request`,
+        request: [this.id, command.toJSON()],
+      };
+
+      this.cometd.publish('/slim/request', request, response => {
+        this.onChannel(response, handler);
+      });
+    } catch (error) {
+      this.logger.error('Error publishing message to LMS server', {
+        name: this.name,
+        error,
+      });
+    }
   }
 
   unsubscribe() {
@@ -112,10 +117,7 @@ export class LMSPlayer {
     });
   }
 
-  private handleChannel(
-    message: Message,
-    handler: MessageHandler<ChannelEvent>,
-  ) {
+  private onChannel(message: Message, handler: MessageHandler<ChannelEvent>) {
     if (!Validators.ChannelEvent.validate(message)) {
       this.logger.error('Unknown message received from LMS server', {
         name: this.name,
@@ -127,17 +129,17 @@ export class LMSPlayer {
     }
   }
 
-  private handleSubscription(
+  private onSubscription(
     message: Message,
-    handler: MessageHandler<SubscriptionStatusEvent>,
+    handler: MessageHandler<SubscriptionEvent>,
   ) {
-    if (!Validators.SubscriptionStatusEvent.validate(message)) {
+    if (!Validators.SubscriptionEvent.validate(message)) {
       this.logger.error(
         'Unknown subscription status received from LMS server',
         {
           name: this.name,
           message,
-          errors: Validators.SubscriptionStatusEvent.validate.errors,
+          errors: Validators.SubscriptionEvent.validate.errors,
         },
       );
     } else {

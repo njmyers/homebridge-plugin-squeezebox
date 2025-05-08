@@ -63,7 +63,7 @@ export class SqueezeBoxSwitchService implements StatusSubscriber {
     );
   }
 
-  update(message: LMSPlayerStatus): void {
+  status(message: LMSPlayerStatus): void {
     const state = PlayerMode.Play === message.mode;
 
     if (this.state !== state) {

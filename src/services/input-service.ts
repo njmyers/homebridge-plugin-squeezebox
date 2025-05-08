@@ -6,7 +6,6 @@ import {
   WithUUID,
 } from 'homebridge';
 
-import { LMSPlayer } from '../lms/index.js';
 import { SqueezeboxHomebridgePlatform } from '../platform.js';
 import { SqueezeboxAccessoryContext } from '../platformAccessory.js';
 import { ServiceLogger } from '../logger.js';
@@ -21,12 +20,16 @@ export class SqueezeBoxInputService {
   constructor(
     private readonly platform: SqueezeboxHomebridgePlatform,
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
-    private readonly player: LMSPlayer,
-    private readonly id: number,
+    private readonly index: number,
+    readonly squeezeId: string,
+    private readonly name: string,
   ) {
-    this.log = new ServiceLogger(platform, this.Name);
+    this.log = new ServiceLogger(platform, this.constructor.name, this.Name);
     this.state = new Map<Characteristics, CharacteristicValue>([
-      [this.platform.Characteristic.ConfiguredName, this.Name],
+      [
+        this.platform.Characteristic.ConfiguredName,
+        SqueezeBoxInputService.sanitize(this.name),
+      ],
     ]);
 
     this.input =
@@ -71,7 +74,7 @@ export class SqueezeBoxInputService {
   }
 
   get Identifier(): number {
-    return this.id;
+    return this.index;
   }
 
   get Subtype(): string {
@@ -82,8 +85,8 @@ export class SqueezeBoxInputService {
     return this.input;
   }
 
-  private get Name(): string {
-    return `${this.accessory.context.player.displayName} Input ${this.Identifier}`;
+  get Name(): string {
+    return `Television Input ${this.Identifier}`;
   }
 
   private get ConfiguredName(): CharacteristicValue {
@@ -110,5 +113,10 @@ export class SqueezeBoxInputService {
       this.state.set(characteristic, value);
       this.input.getCharacteristic(characteristic).updateValue(value);
     }
+  }
+
+  static sanitize(input: string): string {
+    const name = input.replace(/[^a-zA-Z0-9]/g, '');
+    return name.slice(0, 64);
   }
 }

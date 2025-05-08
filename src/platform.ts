@@ -17,6 +17,8 @@ import {
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { LMSServer } from './lms/lms-server.js';
 import { LMSPlayer } from './lms/lms-player.js';
+import { LMSMessage } from './lms/lms-message.js';
+import { LMSCommands } from './lms/lms-commands.js';
 
 export interface SqueezeboxPlatformServerConfig {
   host: string;
@@ -116,6 +118,14 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
           logger: this.log,
         });
 
+        // const favorites = await existingAccessory.context.player.send(
+        //   new LMSMessage({
+        //     command: LMSCommands.Favorites,
+        //     args: ['items', 0, 10],
+        //   }),
+        // );
+
+        // this.log.debug('favorites', JSON.stringify(favorites, null, 2));
         this.api.publishExternalAccessories(PLUGIN_NAME, [existingAccessory]);
 
         // create the accessory handler for the restored accessory
@@ -140,6 +150,14 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
           logger: this.log,
         });
 
+        // const favorites = await accessory.context.player.send(
+        //   new LMSMessage({
+        //     command: LMSCommands.Favorites,
+        //     args: ['items', 0, 10],
+        //   }),
+        // );
+
+        // this.log.debug('favorites', JSON.stringify(favorites, null, 2));
         new SqueezeboxPlatformPlayerAccessory(this, accessory);
         this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
       }

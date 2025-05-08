@@ -17,6 +17,7 @@ import { SqueezeboxHomebridgePlatform } from '../platform.js';
 import { SqueezeboxAccessoryContext } from '../platformAccessory.js';
 import { StatusSubscriber } from './types.js';
 import { ServiceLogger } from '../logger.js';
+import { FavoritesEvent } from '../schemas/types/favorites-event.js';
 import { SqueezeBoxInputService } from './input-service.js';
 
 type Characteristics = WithUUID<new () => Characteristic>;
@@ -25,17 +26,17 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
   private television: Service;
   private state: Map<Characteristics, CharacteristicValue>;
   private log: ServiceLogger;
+  private inputs: SqueezeBoxInputService[] = [];
 
   constructor(
     private readonly platform: SqueezeboxHomebridgePlatform,
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
     private readonly player: LMSPlayer,
-    private readonly inputs: SqueezeBoxInputService[],
   ) {
-    this.log = new ServiceLogger(platform, this.Name);
+    this.log = new ServiceLogger(platform, this.constructor.name, this.Name);
     this.state = new Map<Characteristics, CharacteristicValue>([
       [this.platform.Characteristic.Active, 0],
-      [this.platform.Characteristic.ActiveIdentifier, inputs[0].Identifier],
+      [this.platform.Characteristic.ActiveIdentifier, ''],
       [this.platform.Characteristic.ConfiguredName, this.Name],
       [
         this.platform.Characteristic.CurrentMediaState,
@@ -57,15 +58,9 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
       this.SleepDiscoveryMode,
     );
 
-    this.television.setCharacteristic(
-      this.platform.Characteristic.DisplayOrder,
-      this.platform.api.hap
-        .encode(
-          1,
-          this.inputs.map(i => i.Identifier),
-        )
-        .toString('base64'),
-    );
+    this.television
+      .getCharacteristic(this.platform.Characteristic.DisplayOrder)
+      .onGet(() => this.DisplayOrder);
 
     this.television
       .getCharacteristic(this.platform.Characteristic.ConfiguredName)
@@ -89,10 +84,6 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     this.television
       .getCharacteristic(this.platform.Characteristic.RemoteKey)
       .onSet(this.setRemoteKey.bind(this));
-
-    this.inputs.forEach(input => {
-      this.television.addLinkedService(input.Service);
-    });
   }
 
   private get Name(): CharacteristicValue {
@@ -119,12 +110,21 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     return this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE;
   }
 
+  private get DisplayOrder(): CharacteristicValue {
+    return this.platform.api.hap
+      .encode(
+        1,
+        this.inputs.map(i => i.Identifier),
+      )
+      .toString('base64');
+  }
+
   private setConfiguredName(value: CharacteristicValue): void {
     this.set(this.platform.Characteristic.ConfiguredName, value);
   }
 
   private setActive(value: CharacteristicValue): void {
-    this.log.info('Setting active state', {
+    this.log.debug('Setting active state', {
       value,
     });
 
@@ -135,7 +135,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     }
 
     if (current === value) {
-      this.log.info('Active state is already set to the same value');
+      this.log.debug('Active state is already set to the same value');
       return;
     }
 
@@ -148,7 +148,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
   }
 
   private setActiveIdentifier(value: CharacteristicValue): void {
-    this.log.info('Setting Active Identifier', {
+    this.log.debug('Setting Active Identifier', {
       player: this.accessory.context.player.displayName,
       value,
     });
@@ -157,7 +157,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
   }
 
   private async setRemoteKey(value: CharacteristicValue) {
-    this.log.info('Setting remote key', {
+    this.log.debug('Setting remote key', {
       value,
     });
 
@@ -233,7 +233,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     }
   }
 
-  update(message: LMSPlayerStatus): void {
+  status(message: LMSPlayerStatus): void {
     this.set(this.platform.Characteristic.Active, message.active);
     this.set(
       this.platform.Characteristic.CurrentMediaState,
@@ -241,5 +241,40 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
         ? this.platform.Characteristic.CurrentMediaState.PLAY
         : this.platform.Characteristic.CurrentMediaState.PAUSE,
     );
+  }
+
+  favorites(message: FavoritesEvent): void {
+    this.log.debug('Favorites event', {
+      message,
+    });
+
+    const updated = message.data.loop_loop.filter(favorite => {
+      return !this.inputs.find(input => input.squeezeId === favorite.id);
+    });
+
+    const inputs = updated.map((favorite, index) => {
+      return new SqueezeBoxInputService(
+        this.platform,
+        this.accessory,
+        this.inputs.length + index + 1,
+        favorite.id,
+        favorite.name,
+      );
+    });
+
+    inputs.forEach(input => {
+      this.television.addLinkedService(input.Service);
+    });
+
+    this.inputs.push(...inputs);
+
+    if (
+      !this.inputs.find(input => input.Identifier === this.ActiveIdentifier)
+    ) {
+      this.set(
+        this.platform.Characteristic.ActiveIdentifier,
+        this.inputs[0].Identifier,
+      );
+    }
   }
 }

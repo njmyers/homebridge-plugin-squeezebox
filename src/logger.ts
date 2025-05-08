@@ -34,12 +34,13 @@ export class ConsoleLogger implements Logger {
 export class ServiceLogger {
   constructor(
     private readonly platform: SqueezeboxHomebridgePlatform,
+    private readonly service: string,
     private readonly name: CharacteristicValue,
   ) {}
 
   info(message: string, params?: Record<string, unknown>) {
     this.platform.log.info(message, {
-      service: this.constructor.name,
+      service: this.service,
       name: this.name,
       ...params,
     });
@@ -47,28 +48,28 @@ export class ServiceLogger {
 
   warn(message: string, params?: Record<string, unknown>) {
     this.platform.log.warn(message, {
-      service: this.constructor.name,
+      service: this.service,
       name: this.name,
       ...params,
     });
   }
   error(message: string, params?: Record<string, unknown>) {
     this.platform.log.error(message, {
-      service: this.constructor.name,
+      service: this.service,
       name: this.name,
       ...params,
     });
   }
   debug(message: string, params?: Record<string, unknown>) {
     this.platform.log.debug(message, {
-      service: this.constructor.name,
+      service: this.service,
       name: this.name,
       ...params,
     });
   }
   success(message: string, params?: Record<string, unknown>) {
     this.platform.log.debug(message, {
-      service: this.constructor.name,
+      service: this.service,
       name: this.name,
       ...params,
     });

@@ -11,4 +11,6 @@ export enum LMSCommands {
   Power = 'power',
   Status = 'status',
   Stop = 'stop',
+  Time = 'time',
+  Favorites = 'favorites',
 }

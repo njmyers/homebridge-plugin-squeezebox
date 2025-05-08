@@ -26,7 +26,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
     private readonly player: LMSPlayer,
   ) {
-    this.log = new ServiceLogger(platform, this.Name);
+    this.log = new ServiceLogger(platform, this.constructor.name, this.Name);
     this.state = new Map<Characteristics, CharacteristicValue>([
       [this.platform.Characteristic.Mute, false],
       [this.platform.Characteristic.Volume, 0],
@@ -86,7 +86,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
   }
 
   private async setMute(value: CharacteristicValue) {
-    this.log.info('Setting mute state', {
+    this.log.debug('Setting mute state', {
       value,
     });
 
@@ -97,7 +97,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
     }
 
     if (current === value) {
-      this.log.info('Mute state is already set to the same value');
+      this.log.debug('Mute state is already set to the same value');
       return;
     }
 
@@ -110,7 +110,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
   }
 
   private async setActive(value: CharacteristicValue) {
-    this.log.info('Setting active state', {
+    this.log.debug('Setting active state', {
       value,
     });
 
@@ -121,7 +121,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
     }
 
     if (current === value) {
-      this.log.info('Active state is already set to the same value');
+      this.log.debug('Active state is already set to the same value');
       return;
     }
 
@@ -134,7 +134,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
   }
 
   private async setVolumeSelector(value: CharacteristicValue) {
-    this.log.info('Setting Volume Selector State', {
+    this.log.debug('Setting Volume Selector State', {
       value,
     });
 
@@ -145,12 +145,12 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
     }
 
     if (current >= 100 && value === 0) {
-      this.log.info('Volume is already at maximum');
+      this.log.debug('Volume is already at maximum');
       return;
     }
 
     if (current === 0 && value === 1) {
-      this.log.info('Volume is already at minimum');
+      this.log.debug('Volume is already at minimum');
       return;
     }
 
@@ -171,7 +171,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
     const current = this.state.get(characteristic);
 
     if (current !== value) {
-      this.log.info('Setting speaker state', {
+      this.log.debug('Setting speaker state', {
         characteristic,
         value,
         current,
@@ -182,7 +182,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
     }
   }
 
-  update(message: LMSPlayerStatus): void {
+  status(message: LMSPlayerStatus): void {
     this.set(this.platform.Characteristic.Mute, message.mute);
     this.set(this.platform.Characteristic.Volume, message.volume);
     this.set(this.platform.Characteristic.Active, message.active);
