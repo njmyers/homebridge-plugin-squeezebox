@@ -1,7 +1,6 @@
 import {
   Characteristic,
   CharacteristicValue,
-  Logging,
   PlatformAccessory,
   Service,
   WithUUID,
@@ -12,33 +11,35 @@ import {
   LMSMessage,
   LMSPlayer,
   LMSPlayerStatus,
+  PlayerMode,
 } from '../lms/index.js';
 import { SqueezeboxHomebridgePlatform } from '../platform.js';
 import { SqueezeboxAccessoryContext } from '../platformAccessory.js';
 import { StatusSubscriber } from './types.js';
+import { ServiceLogger } from '../logger.js';
+import { SqueezeBoxInputService } from './input-service.js';
 
 type Characteristics = WithUUID<new () => Characteristic>;
 
 export class SqueezeBoxTelevisionService implements StatusSubscriber {
   private television: Service;
   private state: Map<Characteristics, CharacteristicValue>;
+  private log: ServiceLogger;
 
   constructor(
     private readonly platform: SqueezeboxHomebridgePlatform,
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
     private readonly player: LMSPlayer,
+    private readonly inputs: SqueezeBoxInputService[],
   ) {
-    this.state = new Map([
+    this.log = new ServiceLogger(platform, this.Name);
+    this.state = new Map<Characteristics, CharacteristicValue>([
       [this.platform.Characteristic.Active, 0],
-      [this.platform.Characteristic.Volume, 0],
-      [this.platform.Characteristic.Mute, 0],
+      [this.platform.Characteristic.ActiveIdentifier, inputs[0].Identifier],
+      [this.platform.Characteristic.ConfiguredName, this.Name],
       [
         this.platform.Characteristic.CurrentMediaState,
         this.platform.Characteristic.CurrentMediaState.PAUSE,
-      ],
-      [
-        this.platform.Characteristic.TargetMediaState,
-        this.platform.Characteristic.TargetMediaState.PAUSE,
       ],
     ]);
 
@@ -52,9 +53,29 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     );
 
     this.television.setCharacteristic(
-      this.platform.Characteristic.ConfiguredName,
-      this.ConfiguredName,
+      this.platform.Characteristic.SleepDiscoveryMode,
+      this.SleepDiscoveryMode,
     );
+
+    this.television.setCharacteristic(
+      this.platform.Characteristic.DisplayOrder,
+      this.platform.api.hap
+        .encode(
+          1,
+          this.inputs.map(i => i.Identifier),
+        )
+        .toString('base64'),
+    );
+
+    this.television
+      .getCharacteristic(this.platform.Characteristic.ConfiguredName)
+      .onGet(() => this.ConfiguredName)
+      .onSet(this.setConfiguredName.bind(this));
+
+    this.television
+      .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
+      .onGet(() => this.ActiveIdentifier)
+      .onSet(this.setActiveIdentifier.bind(this));
 
     this.television
       .getCharacteristic(this.platform.Characteristic.Active)
@@ -62,31 +83,16 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
       .onSet(this.setActive.bind(this));
 
     this.television
-      .getCharacteristic(this.platform.Characteristic.Mute)
-      .onGet(() => this.Mute)
-      .onSet(this.setMute.bind(this));
-
-    this.television
-      .getCharacteristic(this.platform.Characteristic.Volume)
-      .onGet(() => this.Volume)
-      .onSet(this.setVolume.bind(this));
+      .getCharacteristic(this.platform.Characteristic.CurrentMediaState)
+      .onGet(() => this.CurrentMediaState);
 
     this.television
       .getCharacteristic(this.platform.Characteristic.RemoteKey)
       .onSet(this.setRemoteKey.bind(this));
 
-    this.television
-      .getCharacteristic(this.platform.Characteristic.SleepDiscoveryMode)
-      .onGet(() => this.SleepDiscoveryMode);
-
-    this.television
-      .getCharacteristic(this.platform.Characteristic.ActiveIdentifier)
-      .onGet(() => this.ActiveIdentifier)
-      .onSet(this.setActiveIdentifier.bind(this));
-  }
-
-  private get log(): Logging {
-    return this.platform.log;
+    this.inputs.forEach(input => {
+      this.television.addLinkedService(input.Service);
+    });
   }
 
   private get Name(): CharacteristicValue {
@@ -94,33 +100,31 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
   }
 
   private get ConfiguredName(): CharacteristicValue {
-    return this.Name;
+    return this.state.get(this.platform.Characteristic.ConfiguredName)!;
   }
 
   private get Active(): CharacteristicValue {
     return this.state.get(this.platform.Characteristic.Active)!;
   }
 
+  private get CurrentMediaState(): CharacteristicValue {
+    return this.state.get(this.platform.Characteristic.CurrentMediaState)!;
+  }
+
   private get ActiveIdentifier(): CharacteristicValue {
-    return 1;
+    return this.state.get(this.platform.Characteristic.ActiveIdentifier)!;
   }
 
   private get SleepDiscoveryMode(): CharacteristicValue {
     return this.platform.Characteristic.SleepDiscoveryMode.ALWAYS_DISCOVERABLE;
   }
 
-  private get Volume(): CharacteristicValue {
-    return this.state.get(this.platform.Characteristic.Volume)!;
-  }
-
-  private get Mute(): CharacteristicValue {
-    return this.state.get(this.platform.Characteristic.Mute)!;
+  private setConfiguredName(value: CharacteristicValue): void {
+    this.set(this.platform.Characteristic.ConfiguredName, value);
   }
 
   private setActive(value: CharacteristicValue): void {
-    this.log.info('Setting Active State', {
-      service: 'SqueezeBoxSpeakerService',
-      player: this.accessory.context.player.displayName,
+    this.log.info('Setting active state', {
       value,
     });
 
@@ -141,8 +145,6 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
         args: [value ? '1' : '0'],
       }),
     );
-
-    this.state.set(this.platform.Characteristic.Active, value);
   }
 
   private setActiveIdentifier(value: CharacteristicValue): void {
@@ -150,27 +152,67 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
       player: this.accessory.context.player.displayName,
       value,
     });
+
+    this.set(this.platform.Characteristic.ActiveIdentifier, value);
   }
 
-  private setMute(value: CharacteristicValue): void {
-    this.log.info('Setting Mute', {
-      player: this.accessory.context.player.displayName,
+  private async setRemoteKey(value: CharacteristicValue) {
+    this.log.info('Setting remote key', {
       value,
     });
-  }
 
-  private setVolume(value: CharacteristicValue): void {
-    this.log.info('Setting Volume', {
-      player: this.accessory.context.player.displayName,
-      value,
-    });
-  }
+    const message = (() => {
+      switch (value) {
+      case this.platform.Characteristic.RemoteKey.PLAY_PAUSE: {
+        return new LMSMessage({
+          command:
+              this.CurrentMediaState ===
+              this.platform.Characteristic.CurrentMediaState.PLAY
+                ? LMSCommands.Pause
+                : LMSCommands.Play,
+        });
+      }
+      case this.platform.Characteristic.RemoteKey.ARROW_RIGHT:
+      case this.platform.Characteristic.RemoteKey.NEXT_TRACK: {
+        return new LMSMessage({
+          command: LMSCommands.Playlist,
+          args: ['index', '+1'],
+        });
+      }
+      case this.platform.Characteristic.RemoteKey.ARROW_LEFT:
+      case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK: {
+        return new LMSMessage({
+          command: LMSCommands.Playlist,
+          args: ['index', '-1'],
+        });
+      }
+      case this.platform.Characteristic.RemoteKey.REWIND: {
+        return new LMSMessage({
+          command: LMSCommands.Time,
+          args: ['-10'],
+        });
+      }
+      case this.platform.Characteristic.RemoteKey.FAST_FORWARD: {
+        return new LMSMessage({
+          command: LMSCommands.Time,
+          args: ['+10'],
+        });
+      }
+      case this.platform.Characteristic.RemoteKey.BACK: {
+        return new LMSMessage({
+          command: LMSCommands.Time,
+          args: ['0'],
+        });
+      }
+      default: {
+        return undefined;
+      }
+      }
+    })();
 
-  private setRemoteKey(value: CharacteristicValue): void {
-    this.log.info('Setting Remote Key', {
-      player: this.accessory.context.player.displayName,
-      value,
-    });
+    if (message) {
+      await this.player.send(message);
+    }
   }
 
   private set(
@@ -180,13 +222,24 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     const current = this.state.get(characteristic);
 
     if (current !== value) {
+      this.log.debug('Updating television state', {
+        characteristic,
+        value,
+        current,
+      });
+
       this.state.set(characteristic, value);
       this.television.getCharacteristic(characteristic).updateValue(value);
     }
   }
 
   update(message: LMSPlayerStatus): void {
-    this.set(this.platform.Characteristic.Volume, message.volume);
     this.set(this.platform.Characteristic.Active, message.active);
+    this.set(
+      this.platform.Characteristic.CurrentMediaState,
+      message.mode === PlayerMode.Play
+        ? this.platform.Characteristic.CurrentMediaState.PLAY
+        : this.platform.Characteristic.CurrentMediaState.PAUSE,
+    );
   }
 }

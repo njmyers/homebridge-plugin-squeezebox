@@ -1,28 +1,32 @@
-import type { Logging, PlatformAccessory } from 'homebridge';
-
-import type { SqueezeboxHomebridgePlatform } from './platform.js';
-import { LMSPlayer } from './lms/lms-player.js';
-import { LMSMessage } from './lms/lms-message.js';
-import { LMSCommands } from './lms/lms-commands.js';
-import { LMSTag } from './lms/lms-player-tags.js';
-
-import { ChannelEvent } from './schemas/types';
-import { Validators } from './schemas/index.js';
+import type { PlatformAccessory } from 'homebridge';
 
 import {
   SqueezeBoxInformationService,
+  SqueezeBoxInputService,
   SqueezeBoxSpeakerService,
   SqueezeBoxSwitchService,
   SqueezeBoxTelevisionService,
 } from './services/index.js';
-import { LMSPlayerStatus } from './lms/lms-player-status.js';
+import {
+  LMSPlayer,
+  LMSMessage,
+  LMSCommands,
+  LMSTag,
+  LMSPlayerStatus,
+} from './lms/index.js';
+
 import { StatusSubscriber } from './services/types.js';
+import { ServiceLogger } from './logger.js';
+import { ChannelEvent } from './schemas/types';
+import { Validators } from './schemas/index.js';
+
+import type { SqueezeboxHomebridgePlatform } from './platform.js';
 
 export interface SqueezeboxAccessoryContext {
   player: LMSPlayer;
 }
 
-const ENABLE_SWITCH = true;
+const ENABLE_SWITCH = false;
 const ENABLE_SPEAKER = true;
 
 /**
@@ -35,21 +39,53 @@ export class SqueezeboxPlatformPlayerAccessory {
   private switch: SqueezeBoxSwitchService | null = null;
   private speaker: SqueezeBoxSpeakerService | null = null;
   private information: SqueezeBoxInformationService;
+  private inputs: SqueezeBoxInputService[] = [];
+
   private subscribers: StatusSubscriber[] = [];
+  private log: ServiceLogger;
 
   constructor(
     private readonly platform: SqueezeboxHomebridgePlatform,
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
   ) {
+    this.log = new ServiceLogger(this.platform, this.Name);
     this.information = new SqueezeBoxInformationService(
       this.platform,
       this.accessory,
+    );
+
+    this.inputs.push(
+      new SqueezeBoxInputService(
+        this.platform,
+        this.accessory,
+        this.accessory.context.player,
+        1,
+      ),
+      new SqueezeBoxInputService(
+        this.platform,
+        this.accessory,
+        this.accessory.context.player,
+        2,
+      ),
+      new SqueezeBoxInputService(
+        this.platform,
+        this.accessory,
+        this.accessory.context.player,
+        3,
+      ),
+      new SqueezeBoxInputService(
+        this.platform,
+        this.accessory,
+        this.accessory.context.player,
+        4,
+      ),
     );
 
     this.television = new SqueezeBoxTelevisionService(
       this.platform,
       this.accessory,
       this.accessory.context.player,
+      this.inputs,
     );
 
     this.subscribers.push(this.television);
@@ -85,17 +121,16 @@ export class SqueezeboxPlatformPlayerAccessory {
     );
   }
 
-  get log(): Logging {
-    return this.platform.log;
+  get Name(): string {
+    return this.accessory.context.player.displayName;
   }
 
   private handler(event: ChannelEvent) {
     if (!Validators.PlayerStatusEvent.validate(event)) {
-      this.log.error('Received non player status message from LMS server', {
-        player: this.accessory.context.player.displayName,
-        event,
-      });
-      return;
+      return this.log.error(
+        'Received non player status message from LMS server',
+        { event },
+      );
     }
 
     const message = new LMSPlayerStatus(event.data);

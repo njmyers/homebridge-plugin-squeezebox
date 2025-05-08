@@ -174,6 +174,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
       this.log.info('Setting speaker state', {
         characteristic,
         value,
+        current,
       });
 
       this.state.set(characteristic, value);
