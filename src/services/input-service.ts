@@ -6,6 +6,7 @@ import {
   WithUUID,
 } from 'homebridge';
 
+import sdbm from 'sdbm';
 import { SqueezeboxHomebridgePlatform } from '../platform.js';
 import { SqueezeboxAccessoryContext } from '../platformAccessory.js';
 import { ServiceLogger } from '../logger.js';
@@ -16,14 +17,18 @@ export class SqueezeBoxInputService {
   private input: Service;
   private state: Map<Characteristics, CharacteristicValue>;
   private log: ServiceLogger;
+  private id: number;
+
+  static DEFAULT_ID = 'NOW_PLAYING';
+  static DEFAULT_NAME = 'Now Playing';
 
   constructor(
     private readonly platform: SqueezeboxHomebridgePlatform,
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
-    private readonly index: number,
-    readonly squeezeId: string,
     private readonly name: string,
+    readonly squeezeId: string,
   ) {
+    this.id = sdbm(this.squeezeId);
     this.log = new ServiceLogger(platform, this.constructor.name, this.Name);
     this.state = new Map<Characteristics, CharacteristicValue>([
       [
@@ -74,7 +79,7 @@ export class SqueezeBoxInputService {
   }
 
   get Identifier(): number {
-    return this.index;
+    return this.id;
   }
 
   get Subtype(): string {
@@ -118,5 +123,9 @@ export class SqueezeBoxInputService {
   static sanitize(input: string): string {
     const name = input.replace(/[^a-zA-Z0-9]/g, '');
     return name.slice(0, 64);
+  }
+
+  match(id: string): boolean {
+    return this.squeezeId === id;
   }
 }

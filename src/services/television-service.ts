@@ -33,11 +33,18 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
     private readonly player: LMSPlayer,
   ) {
+    const input = new SqueezeBoxInputService(
+      platform,
+      accessory,
+      SqueezeBoxInputService.DEFAULT_NAME,
+      SqueezeBoxInputService.DEFAULT_ID,
+    );
+
     this.log = new ServiceLogger(platform, this.constructor.name, this.Name);
     this.state = new Map<Characteristics, CharacteristicValue>([
       [this.platform.Characteristic.Active, 0],
-      [this.platform.Characteristic.ActiveIdentifier, ''],
       [this.platform.Characteristic.ConfiguredName, this.Name],
+      [this.platform.Characteristic.ActiveIdentifier, input.Identifier],
       [
         this.platform.Characteristic.CurrentMediaState,
         this.platform.Characteristic.CurrentMediaState.PAUSE,
@@ -84,6 +91,8 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     this.television
       .getCharacteristic(this.platform.Characteristic.RemoteKey)
       .onSet(this.setRemoteKey.bind(this));
+
+    this.addInput(input);
   }
 
   private get Name(): CharacteristicValue {
@@ -123,7 +132,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     this.set(this.platform.Characteristic.ConfiguredName, value);
   }
 
-  private setActive(value: CharacteristicValue): void {
+  private async setActive(value: CharacteristicValue): Promise<void> {
     this.log.debug('Setting active state', {
       value,
     });
@@ -139,7 +148,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
       return;
     }
 
-    this.player.send(
+    await this.player.send(
       new LMSMessage({
         command: LMSCommands.Power,
         args: [value ? '1' : '0'],
@@ -147,13 +156,27 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     );
   }
 
-  private setActiveIdentifier(value: CharacteristicValue): void {
+  private async setActiveIdentifier(value: CharacteristicValue): Promise<void> {
     this.log.debug('Setting Active Identifier', {
       player: this.accessory.context.player.displayName,
       value,
     });
 
     this.set(this.platform.Characteristic.ActiveIdentifier, value);
+
+    const input = this.inputs.find(i => i.Identifier === value);
+    if (input && !input.match(SqueezeBoxInputService.DEFAULT_ID)) {
+      await this.player.send(
+        new LMSMessage({
+          command: LMSCommands.Favorites,
+          args: [
+            LMSCommands.Playlist,
+            LMSCommands.Play,
+            `item_id:${input.squeezeId}`,
+          ],
+        }),
+      );
+    }
   }
 
   private async setRemoteKey(value: CharacteristicValue) {
@@ -233,6 +256,16 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     }
   }
 
+  private addInput(input: SqueezeBoxInputService): void {
+    this.television.addLinkedService(input.Service);
+    this.inputs.push(input);
+  }
+
+  private removeInput(input: SqueezeBoxInputService): void {
+    this.television.removeLinkedService(input.Service);
+    this.inputs = this.inputs.filter(i => i !== input);
+  }
+
   status(message: LMSPlayerStatus): void {
     this.set(this.platform.Characteristic.Active, message.active);
     this.set(
@@ -243,38 +276,36 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     );
   }
 
-  favorites(message: FavoritesEvent): void {
+  favorites({ data }: FavoritesEvent): void {
     this.log.debug('Favorites event', {
-      message,
+      data,
+      favorites: data.loop_loop[0],
     });
 
-    const updated = message.data.loop_loop.filter(favorite => {
-      return !this.inputs.find(input => input.squeezeId === favorite.id);
-    });
+    const favorites = data.loop_loop;
 
-    const inputs = updated.map((favorite, index) => {
-      return new SqueezeBoxInputService(
-        this.platform,
-        this.accessory,
-        this.inputs.length + index + 1,
-        favorite.id,
-        favorite.name,
-      );
-    });
+    favorites
+      .filter(favorite => !this.inputs.find(input => input.match(favorite.id)))
+      .forEach(favorite => {
+        this.addInput(
+          new SqueezeBoxInputService(
+            this.platform,
+            this.accessory,
+            favorite.name,
+            favorite.id,
+          ),
+        );
+      });
 
-    inputs.forEach(input => {
-      this.television.addLinkedService(input.Service);
-    });
-
-    this.inputs.push(...inputs);
-
-    if (
-      !this.inputs.find(input => input.Identifier === this.ActiveIdentifier)
-    ) {
-      this.set(
-        this.platform.Characteristic.ActiveIdentifier,
-        this.inputs[0].Identifier,
-      );
-    }
+    this.inputs
+      .filter(
+        input =>
+          !favorites.find(
+            favorite =>
+              input.match(favorite.id) ||
+              input.match(SqueezeBoxInputService.DEFAULT_ID),
+          ),
+      )
+      .forEach(input => this.removeInput(input));
   }
 }
