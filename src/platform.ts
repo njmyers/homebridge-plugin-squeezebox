@@ -17,8 +17,6 @@ import {
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { LMSServer } from './lms/lms-server.js';
 import { LMSPlayer } from './lms/lms-player.js';
-import { LMSMessage } from './lms/lms-message.js';
-import { LMSCommands } from './lms/lms-commands.js';
 
 export interface SqueezeboxPlatformServerConfig {
   host: string;
