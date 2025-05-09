@@ -35,7 +35,8 @@
     "ajv": "^8.17.1",
     "cometd": "^8.0.7",
     "cometd-nodejs-client": "^2.0.0",
-    "homebridge-lib": "^7.1.4"
+    "homebridge-lib": "^7.1.4",
+    "sdbm": "^2.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
