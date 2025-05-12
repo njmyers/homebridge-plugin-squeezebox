@@ -9,13 +9,12 @@ import {
   LMSMessage,
   LMSPlayer,
   PlayerMode,
-  LMSPlayerStatus,
 } from '../lms/index.js';
 import { SqueezeboxHomebridgePlatform } from '../platform.js';
 import { SqueezeboxAccessoryContext } from '../platformAccessory.js';
-import { StatusSubscriber } from './types.js';
+import { Subscriber, EventName, Events } from './types.js';
 
-export class SqueezeBoxSwitchService implements StatusSubscriber {
+export class SqueezeBoxSwitchService implements Subscriber {
   private switch: Service;
   private state: boolean;
 
@@ -42,7 +41,7 @@ export class SqueezeBoxSwitchService implements StatusSubscriber {
   }
 
   get Name(): string {
-    return `${this.accessory.context.player.displayName} Switch`;
+    return `${this.player.DisplayName} Switch`;
   }
 
   handler(value: CharacteristicValue): void {
@@ -63,20 +62,22 @@ export class SqueezeBoxSwitchService implements StatusSubscriber {
     );
   }
 
-  status(message: LMSPlayerStatus): void {
-    const state = PlayerMode.Play === message.mode;
+  on(e: Events): void {
+    if (e.name === EventName.Status) {
+      const state = PlayerMode.Play === e.message.mode;
 
-    if (this.state !== state) {
-      this.log.debug('Updating switch state', {
-        mode: message.mode,
-        name: this.player.displayName,
-      });
+      if (this.state !== state) {
+        this.log.debug('Updating switch state', {
+          mode: e.message.mode,
+          player: this.player.DisplayName,
+        });
 
-      this.state = state;
-      this.switch.updateCharacteristic(
-        this.platform.Characteristic.On,
-        this.state,
-      );
+        this.state = state;
+        this.switch.updateCharacteristic(
+          this.platform.Characteristic.On,
+          this.state,
+        );
+      }
     }
   }
 }

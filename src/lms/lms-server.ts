@@ -12,8 +12,9 @@ interface LMSServerOptions {
 }
 
 export class LMSServer {
-  private host: string;
-  private port: number;
+  host: string;
+  port: number;
+
   private log: Logger;
 
   constructor({ host, port, log }: LMSServerOptions) {

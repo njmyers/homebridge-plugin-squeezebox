@@ -8,15 +8,14 @@ import type {
 import type { SqueezeboxHomebridgePlatform } from '../platform.js';
 import type { SqueezeboxAccessoryContext } from '../platformAccessory.js';
 import { LMSPlayer } from '../lms/lms-player.js';
-import { StatusSubscriber } from './types.js';
+import { Subscriber, EventName, Events } from './types.js';
 import { LMSMessage } from '../lms/lms-message.js';
 import { LMSCommands } from '../lms/lms-commands.js';
 import { ServiceLogger } from '../logger.js';
-import { LMSPlayerStatus } from '../lms/index.js';
 
 type Characteristics = WithUUID<new () => Characteristic>;
 
-export class SqueezeBoxSpeakerService implements StatusSubscriber {
+export class SqueezeBoxSpeakerService implements Subscriber {
   private speaker: Service;
   private state: Map<Characteristics, CharacteristicValue>;
   private log: ServiceLogger;
@@ -70,7 +69,7 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
   }
 
   private get Name(): CharacteristicValue {
-    return `${this.accessory.context.player.displayName} Volume`;
+    return `${this.player.DisplayName} Volume`;
   }
 
   private get Mute(): CharacteristicValue {
@@ -182,9 +181,11 @@ export class SqueezeBoxSpeakerService implements StatusSubscriber {
     }
   }
 
-  status(message: LMSPlayerStatus): void {
-    this.set(this.platform.Characteristic.Mute, message.mute);
-    this.set(this.platform.Characteristic.Volume, message.volume);
-    this.set(this.platform.Characteristic.Active, message.active);
+  on(e: Events): void {
+    if (e.name === EventName.Status) {
+      this.set(this.platform.Characteristic.Mute, e.message.mute);
+      this.set(this.platform.Characteristic.Volume, e.message.volume);
+      this.set(this.platform.Characteristic.Active, e.message.active);
+    }
   }
 }

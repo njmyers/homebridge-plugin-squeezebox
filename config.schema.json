@@ -9,6 +9,7 @@
     "description": "List of accessories to be created.",
     "items": {
       "type": "object",
+      "required": ["name", "host"],
       "properties": {
         "name": {
           "title": "Name",
@@ -22,11 +23,23 @@
           "required": true,
           "default": "192.168.1.1"
         },
-        "port": {
-          "title": "Port",
-          "type": "integer",
-          "required": true,
-          "default": 9000
+        "ports": {
+          "title": "Ports",
+          "type": "object",
+          "properties": {
+            "http": {
+              "title": "HTTP port for JSON RPC requests",
+              "type": "integer",
+              "required": true,
+              "default": 9000
+            },
+            "telenet": {
+              "title": "Telenet port for notifications",
+              "type": "integer",
+              "required": true,
+              "default": 9090
+            }
+          }
         }
       }
     }

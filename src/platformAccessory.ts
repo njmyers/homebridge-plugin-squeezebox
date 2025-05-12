@@ -12,9 +12,10 @@ import {
   LMSCommands,
   LMSTag,
   LMSPlayerStatus,
+  LMSTelenetTopic,
 } from './lms/index.js';
 
-import { StatusSubscriber } from './services/types.js';
+import { EventName, Subscriber } from './services/types.js';
 import { ServiceLogger } from './logger.js';
 import { ChannelEvent } from './schemas/types';
 import { Validators } from './schemas/index.js';
@@ -22,7 +23,7 @@ import { Validators } from './schemas/index.js';
 import type { SqueezeboxHomebridgePlatform } from './platform.js';
 
 export interface SqueezeboxAccessoryContext {
-  player: LMSPlayer;
+  player: string;
 }
 
 const ENABLE_SWITCH = false;
@@ -39,23 +40,25 @@ export class SqueezeboxPlatformPlayerAccessory {
   private speaker: SqueezeBoxSpeakerService | null = null;
   private information: SqueezeBoxInformationService;
 
-  private subscribers: StatusSubscriber[] = [];
+  private subscribers: Subscriber[] = [];
   private log: ServiceLogger;
 
   constructor(
     private readonly platform: SqueezeboxHomebridgePlatform,
     private readonly accessory: PlatformAccessory<SqueezeboxAccessoryContext>,
+    private readonly player: LMSPlayer,
   ) {
     this.log = new ServiceLogger(platform, this.constructor.name, this.Name);
     this.information = new SqueezeBoxInformationService(
       this.platform,
       this.accessory,
+      this.player,
     );
 
     this.television = new SqueezeBoxTelevisionService(
       this.platform,
       this.accessory,
-      this.accessory.context.player,
+      this.player,
     );
 
     this.subscribers.push(this.television);
@@ -64,7 +67,7 @@ export class SqueezeboxPlatformPlayerAccessory {
       this.switch = new SqueezeBoxSwitchService(
         this.platform,
         this.accessory,
-        this.accessory.context.player,
+        this.player,
       );
 
       this.subscribers.push(this.switch);
@@ -74,73 +77,67 @@ export class SqueezeboxPlatformPlayerAccessory {
       this.speaker = new SqueezeBoxSpeakerService(
         this.platform,
         this.accessory,
-        this.accessory.context.player,
+        this.player,
       );
 
       this.subscribers.push(this.speaker);
     }
 
-    this.accessory.context.player.subscribe(
+    this.player.connect(
       message => this.handler(message),
       subscription => {
         this.log.info('Subscription enabled', subscription);
 
-        const commands = [
-          new LMSMessage({
-            command: LMSCommands.Status,
-            args: ['-', 1, 'subscribe:30'],
-            tags: [LMSTag.Volume, LMSTag.PlayerState],
-          }),
-          new LMSMessage({
-            command: LMSCommands.Favorites,
-            args: ['items', 0, 10, 'subscribe:30'],
-          }),
+        const subscriptions = [
+          {
+            message: new LMSMessage({
+              command: LMSCommands.Status,
+              args: ['-', 1, 'subscribe:30'],
+              tags: [LMSTag.Volume, LMSTag.PlayerState],
+            }),
+          },
+          {
+            topic: LMSTelenetTopic.FavoritesChanged,
+            message: new LMSMessage({
+              command: LMSCommands.Favorites,
+              args: ['items', 0, 10],
+            }),
+          },
         ];
 
-        commands.forEach(command => {
-          this.accessory.context.player.publish(
-            subscription.clientId,
-            command,
-            message => this.handler(message),
-          );
+        this.player.subscribe(subscription.clientId, subscriptions, message => {
+          this.handler(message);
         });
       },
     );
   }
 
   get Name(): string {
-    return this.accessory.context.player.displayName;
+    return this.player.DisplayName;
   }
 
   private handler(event: ChannelEvent) {
     if (Validators.PlayerStatusEvent.validate(event)) {
       const message = new LMSPlayerStatus(event.data);
       return this.subscribers.forEach(subscriber => {
-        if (subscriber.status) {
-          subscriber.status(message);
-        }
+        subscriber.on({ name: EventName.Status, message });
       });
     }
 
     if (Validators.FavoritesEvent.validate(event)) {
       return this.subscribers.forEach(subscriber => {
-        if (subscriber.favorites) {
-          subscriber.favorites(event);
-        }
+        subscriber.on({ name: EventName.Favorites, message: event });
       });
     }
 
     if (Validators.SubscriptionEvent.validate(event)) {
       return this.subscribers.forEach(subscriber => {
-        if (subscriber.subscription) {
-          subscriber.subscription(event);
-        }
+        subscriber.on({ name: EventName.Subscription, message: event });
       });
     }
 
-    return this.log.error(
-      'Received non player status message from LMS server',
-      { event },
-    );
+    return this.log.error('Received unknown message from LMS server', {
+      event,
+    });
   }
 }

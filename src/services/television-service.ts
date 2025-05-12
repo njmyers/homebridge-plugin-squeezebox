@@ -10,19 +10,17 @@ import {
   LMSCommands,
   LMSMessage,
   LMSPlayer,
-  LMSPlayerStatus,
   PlayerMode,
 } from '../lms/index.js';
 import { SqueezeboxHomebridgePlatform } from '../platform.js';
 import { SqueezeboxAccessoryContext } from '../platformAccessory.js';
-import { StatusSubscriber } from './types.js';
+import { Subscriber, EventName, Events } from './types.js';
 import { ServiceLogger } from '../logger.js';
-import { FavoritesEvent } from '../schemas/types/favorites-event.js';
 import { SqueezeBoxInputService } from './input-service.js';
 
 type Characteristics = WithUUID<new () => Characteristic>;
 
-export class SqueezeBoxTelevisionService implements StatusSubscriber {
+export class SqueezeBoxTelevisionService implements Subscriber {
   private television: Service;
   private state: Map<Characteristics, CharacteristicValue>;
   private log: ServiceLogger;
@@ -96,7 +94,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
   }
 
   private get Name(): CharacteristicValue {
-    return this.accessory.context.player.displayName;
+    return this.player.DisplayName;
   }
 
   private get ConfiguredName(): CharacteristicValue {
@@ -158,7 +156,7 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
 
   private async setActiveIdentifier(value: CharacteristicValue): Promise<void> {
     this.log.debug('Setting Active Identifier', {
-      player: this.accessory.context.player.displayName,
+      player: this.player.DisplayName,
       value,
     });
 
@@ -266,46 +264,55 @@ export class SqueezeBoxTelevisionService implements StatusSubscriber {
     this.inputs = this.inputs.filter(i => i !== input);
   }
 
-  status(message: LMSPlayerStatus): void {
-    this.set(this.platform.Characteristic.Active, message.active);
-    this.set(
-      this.platform.Characteristic.CurrentMediaState,
-      message.mode === PlayerMode.Play
-        ? this.platform.Characteristic.CurrentMediaState.PLAY
-        : this.platform.Characteristic.CurrentMediaState.PAUSE,
-    );
-  }
+  on(e: Events): void {
+    switch (e.name) {
+    case EventName.Status: {
+      this.set(this.platform.Characteristic.Active, e.message.active);
+      this.set(
+        this.platform.Characteristic.CurrentMediaState,
+        e.message.mode === PlayerMode.Play
+          ? this.platform.Characteristic.CurrentMediaState.PLAY
+          : this.platform.Characteristic.CurrentMediaState.PAUSE,
+      );
+      return;
+    }
 
-  favorites({ data }: FavoritesEvent): void {
-    this.log.debug('Favorites event', {
-      data,
-      favorites: data.loop_loop[0],
-    });
-
-    const favorites = data.loop_loop;
-
-    favorites
-      .filter(favorite => !this.inputs.find(input => input.match(favorite.id)))
-      .forEach(favorite => {
-        this.addInput(
-          new SqueezeBoxInputService(
-            this.platform,
-            this.accessory,
-            favorite.name,
-            favorite.id,
-          ),
-        );
+    case EventName.Favorites: {
+      this.log.debug('Favorites e', {
+        message: e.message,
+        favorites: e.message.data.loop_loop[0],
       });
 
-    this.inputs
-      .filter(
-        input =>
-          !favorites.find(
-            favorite =>
-              input.match(favorite.id) ||
-              input.match(SqueezeBoxInputService.DEFAULT_ID),
-          ),
-      )
-      .forEach(input => this.removeInput(input));
+      const favorites = e.message.data.loop_loop;
+
+      favorites
+        .filter(
+          favorite => !this.inputs.find(input => input.match(favorite.id)),
+        )
+        .forEach(favorite => {
+          this.addInput(
+            new SqueezeBoxInputService(
+              this.platform,
+              this.accessory,
+              favorite.name,
+              favorite.id,
+            ),
+          );
+        });
+
+      this.inputs
+        .filter(
+          input =>
+            !favorites.find(
+              favorite =>
+                input.match(favorite.id) ||
+                  input.match(SqueezeBoxInputService.DEFAULT_ID),
+            ),
+        )
+        .forEach(input => this.removeInput(input));
+
+      return;
+    }
+    }
   }
 }

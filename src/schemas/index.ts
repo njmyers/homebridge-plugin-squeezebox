@@ -7,7 +7,12 @@ import {
   PlayerStatusEvent,
 } from './player.js';
 import { Favorite, FavoritesEvent, FavoritesResponse } from './favorites.js';
-import { ChannelEvent, SubscriptionEvent } from './channel.js';
+import {
+  ChannelEvent,
+  SubscriptionEvent,
+  SubscriptionFailureEvent,
+  SubscriptionSuccessEvent,
+} from './channel.js';
 import * as T from './types/index.js';
 
 export const Schemas = {
@@ -19,6 +24,8 @@ export const Schemas = {
   Favorite,
   FavoritesResponse,
   FavoritesEvent,
+  SubscriptionSuccessEvent,
+  SubscriptionFailureEvent,
   SubscriptionEvent,
   ChannelEvent,
 };
@@ -38,5 +45,11 @@ export const Validators = {
   FavoritesEvent: create<T.FavoritesEvent>(FavoritesEvent),
   FavoritesResponse: create<T.FavoritesResponse>(FavoritesResponse),
   SubscriptionEvent: create<T.SubscriptionEvent>(SubscriptionEvent),
+  SubscriptionSuccessEvent: create<T.SubscriptionSuccessEvent>(
+    SubscriptionSuccessEvent,
+  ),
+  SubscriptionFailureEvent: create<T.SubscriptionFailureEvent>(
+    SubscriptionFailureEvent,
+  ),
   ChannelEvent: create<T.ChannelEvent>(ChannelEvent),
 };

@@ -17,15 +17,8 @@ import {
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { LMSServer } from './lms/lms-server.js';
 import { LMSPlayer } from './lms/lms-player.js';
-
-export interface SqueezeboxPlatformServerConfig {
-  host: string;
-  port: number;
-}
-
-export interface SqueezeboxPlatformConfig {
-  accessories: SqueezeboxPlatformServerConfig[];
-}
+import { LMSTelenetNotifier } from './lms/lms-telenet-notifier.js';
+import { SqueezeBoxPlatformConfig } from './config.js';
 
 type SqueezeboxAccessory = PlatformAccessory<SqueezeboxAccessoryContext>;
 
@@ -41,19 +34,32 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: Map<string, SqueezeboxAccessory> = new Map();
   public readonly discoveredCacheUUIDs: string[] = [];
-  private readonly server: LMSServer;
+  private readonly servers: LMSServer[] = [];
+  private readonly notifiers: LMSTelenetNotifier[] = [];
 
   constructor(
     public readonly log: Logging,
-    public readonly config: PlatformConfig & SqueezeboxPlatformConfig,
+    public readonly config: PlatformConfig & SqueezeBoxPlatformConfig,
     public readonly api: API,
   ) {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
-    this.server = new LMSServer({
-      port: config.accessories[0].port,
-      host: config.accessories[0].host,
-      log: this.log,
+    this.config.accessories.forEach(accessory => {
+      this.notifiers.push(
+        new LMSTelenetNotifier({
+          host: accessory.host,
+          port: accessory.ports.telenet,
+          logger: this.log,
+        }),
+      );
+
+      this.servers.push(
+        new LMSServer({
+          port: accessory.ports.http,
+          host: accessory.host,
+          log: this.log,
+        }),
+      );
     });
 
     this.log.debug('Finished initializing platform:', this.config.name);
@@ -70,8 +76,9 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
   }
 
   /**
-   * This function is invoked when homebridge restores cached accessories from disk at startup.
-   * It should be used to set up event handlers for characteristics and update respective values.
+   * This function is invoked when homebridge restores cached accessories
+   * from disk at startup. It should be used to set up event handlers for
+   * characteristics and update respective values.
    */
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
@@ -89,93 +96,93 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   async discoverDevices() {
-    const data = await this.server.getPlayers();
+    for (const server of this.servers) {
+      const data = await server.getPlayers();
 
-    // loop over the discovered devices and register each one if it has not already been registered
-    for (const player of data.result.players_loop) {
-      const name = _.startCase(_.camelCase(player.name));
-      const uuid = this.api.hap.uuid.generate(`${player.playerid}-v2`);
-      const existingAccessory = this.accessories.get(uuid);
+      // loop over the discovered devices and register each one if it has not already been registered
+      for (const player of data.result.players_loop) {
+        const name = _.startCase(_.camelCase(player.name));
+        const uuid = this.api.hap.uuid.generate(player.playerid);
 
-      if (existingAccessory) {
-        // the accessory already exists
-        this.log.info(
-          'Restoring existing accessory from cache:',
-          existingAccessory.displayName,
-        );
-
-        // Adding a category is some special sauce that gets this to work properly.
-        // @see https://github.com/homebridge/homebridge/issues/2553#issuecomment-623675893
-        existingAccessory.category = Categories.SPEAKER;
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
-        existingAccessory.context.player = new LMSPlayer({
-          id: player.playerid,
-          name,
-          port: this.config.accessories[0].port,
-          host: this.config.accessories[0].host,
-          logger: this.log,
-        });
-
-        // const favorites = await existingAccessory.context.player.send(
-        //   new LMSMessage({
-        //     command: LMSCommands.Favorites,
-        //     args: ['items', 0, 10],
-        //   }),
-        // );
-
-        // this.log.debug('favorites', JSON.stringify(favorites, null, 2));
-        this.api.publishExternalAccessories(PLUGIN_NAME, [existingAccessory]);
-
-        // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
-        new SqueezeboxPlatformPlayerAccessory(this, existingAccessory);
-      } else {
-        this.log.info('Adding new accessory:', name);
-        const accessory =
-          new this.api.platformAccessory<SqueezeboxAccessoryContext>(
-            name,
-            uuid,
+        if (this.accessories.has(uuid)) {
+          const accessory = this.accessories.get(uuid)!;
+          // the accessory already exists
+          this.log.info(
+            'Restoring existing accessory from cache:',
+            accessory.displayName,
           );
 
-        // Adding a category is some special sauce that gets this to work properly.
-        // @see https://github.com/homebridge/homebridge/issues/2553#issuecomment-623675893
-        accessory.category = Categories.SPEAKER;
-        accessory.context.player = new LMSPlayer({
-          id: player.playerid,
-          name,
-          port: this.config.accessories[0].port,
-          host: this.config.accessories[0].host,
-          logger: this.log,
-        });
+          accessory.category = Categories.SPEAKER;
+          accessory.context.player = player.playerid;
+          this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
 
-        // const favorites = await accessory.context.player.send(
-        //   new LMSMessage({
-        //     command: LMSCommands.Favorites,
-        //     args: ['items', 0, 10],
-        //   }),
-        // );
+          // create the accessory handler for the restored accessory
+          // this is imported from `platformAccessory.ts`
+          new SqueezeboxPlatformPlayerAccessory(
+            this,
+            accessory,
+            new LMSPlayer({
+              id: player.playerid,
+              name,
+              port: server.port,
+              host: server.host,
+              model: player.model,
+              manufacturer: player.modelname,
+              version: String(player.firmware),
+              logger: this.log,
+              notifier: this.notifiers.find(n => n.host === server.host)!,
+            }),
+          );
+        } else {
+          this.log.info('Adding new accessory:', name);
+          const accessory =
+            new this.api.platformAccessory<SqueezeboxAccessoryContext>(
+              name,
+              uuid,
+            );
 
-        // this.log.debug('favorites', JSON.stringify(favorites, null, 2));
-        new SqueezeboxPlatformPlayerAccessory(this, accessory);
-        this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
+          accessory.category = Categories.SPEAKER;
+          accessory.context.player = player.playerid;
+
+          new SqueezeboxPlatformPlayerAccessory(
+            this,
+            accessory,
+            new LMSPlayer({
+              id: player.playerid,
+              name,
+              port: server.port,
+              host: server.host,
+              model: player.model,
+              manufacturer: player.modelname,
+              version: String(player.firmware),
+              logger: this.log,
+              notifier: this.notifiers.find(n => n.host === server.host)!,
+            }),
+          );
+          this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
+        }
+
+        // push into discoveredCacheUUIDs
+        this.discoveredCacheUUIDs.push(uuid);
       }
 
-      // push into discoveredCacheUUIDs
-      this.discoveredCacheUUIDs.push(uuid);
-    }
-
-    // you can also deal with accessories from the cache which are no longer present by removing them from Homebridge
-    // for example, if your plugin logs into a cloud account to retrieve a device list, and a user has previously removed a device
-    // from this cloud account, then this device will no longer be present in the device list but will still be in the Homebridge cache
-    for (const [uuid, accessory] of this.accessories) {
-      if (!this.discoveredCacheUUIDs.includes(uuid)) {
-        this.log.info(
-          'Removing existing accessory from cache:',
-          accessory.displayName,
-        );
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
-          accessory,
-        ]);
+      /**
+       * You can also deal with accessories from the cache which are no longer
+       * present by removing them from Homebridge for example, if your plugin logs
+       * into a cloud account to retrieve a device list, and a user has previously
+       * removed a device from this cloud account, then this device will no longer
+       * be present in the device list but will still be in the Homebridge cache
+       */
+      for (const [uuid, accessory] of this.accessories) {
+        if (!this.discoveredCacheUUIDs.includes(uuid)) {
+          this.log.info(
+            'Removing existing accessory from cache',
+            accessory.displayName,
+          );
+          this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
+            accessory,
+          ]);
+        }
       }
     }
   }
