@@ -15,6 +15,10 @@
   "bugs": {
     "url": "https://github.com/njmyers/homebridge-plugin-squeezebox/issues"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "keywords": [
     "homebridge-plugin"
   ],
