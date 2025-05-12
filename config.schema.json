@@ -23,23 +23,17 @@
           "required": true,
           "default": "192.168.1.1"
         },
-        "ports": {
-          "title": "Ports",
-          "type": "object",
-          "properties": {
-            "http": {
-              "title": "HTTP port for JSON RPC requests",
-              "type": "integer",
-              "required": true,
-              "default": 9000
-            },
-            "telenet": {
-              "title": "Telenet port for notifications",
-              "type": "integer",
-              "required": true,
-              "default": 9090
-            }
-          }
+        "telenetPort": {
+          "title": "Telenet port for notifications",
+          "type": "integer",
+          "required": true,
+          "default": 9090
+        },
+        "httpPort": {
+          "title": "HTTP port for JSON RPC requests",
+          "type": "integer",
+          "required": true,
+          "default": 9000
         }
       }
     }

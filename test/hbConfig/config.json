@@ -30,10 +30,8 @@
         {
           "name": "Home LMS Platform",
           "host": "192.168.1.50",
-          "ports": {
-            "http": 9000,
-            "telenet": 9090
-          }
+          "httpPort": 9000,
+          "telenetPort": 9090
         }
       ]
     }

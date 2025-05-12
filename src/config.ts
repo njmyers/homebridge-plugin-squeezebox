@@ -5,7 +5,8 @@ export interface SqueezeBoxServerPorts {
 
 export interface SqueezeBoxPlatformServerConfig {
   host: string;
-  ports: SqueezeBoxServerPorts;
+  httpPort: number;
+  telenetPort: number;
 }
 
 export interface SqueezeBoxPlatformConfig {
