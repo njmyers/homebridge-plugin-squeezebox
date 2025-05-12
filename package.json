@@ -1,10 +1,10 @@
 {
   "name": "@njmyers/homebridge-plugin-squeezebox",
-  "displayName": "Plugin Name",
+  "displayName": "SqueezeboxHomebridgePlugin",
   "type": "module",
   "version": "1.0.1-beta.0",
   "private": false,
-  "description": "A short description about what your plugin does.",
+  "description": "Control your Squeezebox devices with HomeKit",
   "author": "Nicholas Myers",
   "license": "Apache-2.0",
   "homepage": "https://github.com/njmyers/homebridge-plugin-squeezebox/blob/latest/README.md",
@@ -20,7 +20,10 @@
     "registry": "https://registry.npmjs.org/"
   },
   "keywords": [
-    "homebridge-plugin"
+    "homebridge-plugin",
+    "squeezebox",
+    "homekit",
+    "lyrion-music-server"
   ],
   "main": "dist/index.js",
   "engines": {
@@ -40,6 +43,7 @@
     "cometd": "^8.0.7",
     "cometd-nodejs-client": "^2.0.0",
     "homebridge-lib": "^7.1.4",
+    "lodash": "^4.17.21",
     "sdbm": "^2.0.0"
   },
   "devDependencies": {
@@ -48,12 +52,11 @@
     "eslint": "^9.21.0",
     "homebridge": "^2.0.0-beta.0",
     "json-schema-to-typescript": "^15.0.4",
-    "lodash": "^4.17.21",
     "nodemon": "^3.1.9",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.24.1"
+    "typescript-eslint": "^8.24.1"  
   }
 }
