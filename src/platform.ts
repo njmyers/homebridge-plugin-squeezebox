@@ -48,14 +48,14 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
       this.notifiers.push(
         new LMSTelenetNotifier({
           host: accessory.host,
-          port: accessory.telenetPort,
+          port: accessory.ports.cli,
           logger: this.log,
         }),
       );
 
       this.servers.push(
         new LMSServer({
-          port: accessory.httpPort,
+          port: accessory.ports.http,
           host: accessory.host,
           log: this.log,
         }),
