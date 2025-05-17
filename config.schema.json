@@ -4,36 +4,48 @@
   "singular": true,
   "strictValidation": false,
   "schema": {
-    "type": "array",
-    "title": "Accessories",
-    "description": "List of accessories to be created.",
-    "items": {
-      "type": "object",
-      "required": ["name", "host"],
-      "properties": {
-        "name": {
-          "title": "Name",
-          "type": "string",
-          "required": true,
-          "default": "Home LMS"
-        },
-        "host": {
-          "title": "Host",
-          "type": "string",
-          "required": true,
-          "default": "192.168.1.1"
-        },
-        "telenetPort": {
-          "title": "Telenet port for notifications",
-          "type": "integer",
-          "required": true,
-          "default": 9090
-        },
-        "httpPort": {
-          "title": "HTTP port for JSON RPC requests",
-          "type": "integer",
-          "required": true,
-          "default": 9000
+    "type": "object",
+    "properties": {
+      "accessories": {
+        "title": "Accessories",
+        "type": "array",
+        "description": "List of accessories to be created.",
+        "items": {
+          "type": "object",
+          "required": ["name", "host"],
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "required": true,
+              "default": "Home LMS"
+            },
+            "host": {
+              "title": "Host",
+              "type": "string",
+              "required": true,
+              "default": "192.168.1.1"
+            },
+            "ports": {
+              "type": "object",
+              "title": "Ports",
+              "description": "Ports for the LMS server.",
+              "properties": {
+                "cli": {
+                  "title": "CLI port for notifications",
+                  "type": "integer",
+                  "required": true,
+                  "default": 9090
+                },
+                "http": {
+                  "title": "HTTP port for JSON RPC requests",
+                  "type": "integer",
+                  "required": true,
+                  "default": 9000
+                }
+              }
+            }
+          }
         }
       }
     }
