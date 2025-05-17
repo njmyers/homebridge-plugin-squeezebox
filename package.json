@@ -2,7 +2,7 @@
   "name": "@njmyers/homebridge-plugin-squeezebox",
   "displayName": "SqueezeboxHomebridgePlugin",
   "type": "module",
-  "version": "1.0.3-beta.0",
+  "version": "1.0.4-beta.0",
   "private": false,
   "description": "Control your Squeezebox devices with HomeKit",
   "author": "Nicholas Myers",
