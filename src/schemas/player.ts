@@ -120,7 +120,7 @@ export const Playlist = {
   additionalProperties: false,
   properties: {
     'playlist index': {
-      type: 'number',
+      anyOf: [{ type: 'number' }, { type: 'string' }],
       description: 'Playlist index',
     },
     'title': {
