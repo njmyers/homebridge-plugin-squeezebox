@@ -33,6 +33,18 @@ export class LMSTelenetNotifier {
     this.logger = logger;
     this.host = host;
     this.socket = new net.Socket();
+
+    // Without an 'error' listener, a connection failure (e.g. the LMS
+    // server being unreachable) throws an uncaught exception that crashes
+    // Homebridge, so we must always handle it here instead.
+    this.socket.on('error', error => {
+      this.logger.error('Telenet connection error with LMS', {
+        host,
+        port,
+        message: error.message,
+      });
+    });
+
     this.socket.connect(port, host, () => {
       logger.info('Telenet connections established with LMS', {
         host,

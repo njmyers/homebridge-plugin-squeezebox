@@ -71,7 +71,9 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      this.discoverDevices();
+      this.discoverDevices().catch(error => {
+        this.log.error('Failed to discover devices', error);
+      });
     });
   }
 
@@ -97,7 +99,17 @@ export class SqueezeboxHomebridgePlatform implements DynamicPlatformPlugin {
    */
   async discoverDevices() {
     for (const server of this.servers) {
-      const data = await server.getPlayers();
+      let data;
+      try {
+        data = await server.getPlayers();
+      } catch (error) {
+        this.log.error('Failed to reach LMS server, skipping', {
+          host: server.host,
+          port: server.port,
+          error,
+        });
+        continue;
+      }
 
       // loop over the discovered devices and register each one if it has not already been registered
       for (const player of data.result.players_loop) {
