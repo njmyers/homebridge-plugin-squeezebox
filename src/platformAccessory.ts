@@ -17,7 +17,7 @@ import {
 
 import { EventName, Subscriber } from './services/types.js';
 import { ServiceLogger } from './logger.js';
-import { ChannelEvent } from './schemas/types';
+import { ChannelEvent } from './schemas/types/index.js';
 import { Validators } from './schemas/index.js';
 
 import type { SqueezeboxHomebridgePlatform } from './platform.js';

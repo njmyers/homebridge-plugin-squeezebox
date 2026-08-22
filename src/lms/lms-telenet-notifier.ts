@@ -33,6 +33,15 @@ export class LMSTelenetNotifier {
     this.logger = logger;
     this.host = host;
     this.socket = new net.Socket();
+
+    this.socket.on('error', error => {
+      this.logger.error('Telenet connection error with LMS', {
+        host,
+        port,
+        message: error.message,
+      });
+    });
+
     this.socket.connect(port, host, () => {
       logger.info('Telenet connections established with LMS', {
         host,
